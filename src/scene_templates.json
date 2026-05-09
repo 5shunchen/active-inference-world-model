@@ -1,0 +1,81 @@
+{
+  "biomes": {
+    "jungle": {
+      "name": "热带丛林",
+      "terrain_features": ["trees", "bushes", "rivers", "caves"],
+      "weather_default": "tropical",
+      "day_cycle": true
+    },
+    "savanna": {
+      "name": "热带草原",
+      "terrain_features": ["grass", "watering_hole", "acacia_trees", "rocks"],
+      "weather_default": "dry",
+      "day_cycle": true
+    },
+    "desert": {
+      "name": "沙漠",
+      "terrain_features": ["sand_dunes", "oasis", "rocks"],
+      "weather_default": "hot_dry",
+      "day_cycle": true
+    }
+  },
+
+  "agents": {
+    "tiger": {
+      "name": "老虎",
+      "life_stages": ["cub", "juvenile", "adult", "elderly"],
+      "state_factors": ["position", "hunger", "health", "age", "reproductive_state"],
+      "actions": ["move", "drink", "hunt", "eat", "rest", "mate", "nurture"],
+      "default_preferences": {
+        "low_hunger": 0.8,
+        "high_health": 0.7,
+        "near_water": 0.5,
+        "reproduction": 0.4
+      }
+    },
+    "deer": {
+      "name": "鹿",
+      "life_stages": ["young", "adult", "old"],
+      "state_factors": ["position", "hunger", "health", "fear"],
+      "actions": ["move", "drink", "graze", "flee", "rest", "mate"],
+      "default_preferences": {
+        "low_hunger": 0.7,
+        "high_health": 0.8,
+        "safe": 0.9
+      }
+    }
+  },
+
+  "entities": {
+    "prey": {
+      "types": ["deer", "boar", "rabbit"],
+      "density": 0.3
+    },
+    "water_source": {
+      "types": ["river", "lake", "watering_hole"],
+      "density": 0.15
+    },
+    "trees": {
+      "density": 0.5
+    }
+  },
+
+  "prompt_templates": {
+    "老虎的生命历程": {
+      "biome": "jungle",
+      "agent_type": "tiger",
+      "life_stage": "cub",
+      "duration": "lifespan",
+      "entities": ["prey", "water_source", "trees"],
+      "physics": "default_ecology"
+    },
+    "tiger life story": {
+      "biome": "jungle",
+      "agent_type": "tiger",
+      "life_stage": "cub",
+      "duration": "lifespan",
+      "entities": ["prey", "water_source", "trees"],
+      "physics": "default_ecology"
+    }
+  }
+}
