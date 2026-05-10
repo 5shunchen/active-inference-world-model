@@ -5,9 +5,27 @@ LLM-powered Enhanced Narrative Generator
 支持多种LLM后端：OpenAI、Claude、本地模型
 """
 
-from typing import List, Dict, Any
+import os
+import json
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+
+# 定义占位符，避免未绑定变量错误
+OpenAI = None
+anthropic = None
+
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 
 class EventType(Enum):
@@ -435,4 +453,189 @@ def generate_simple_narrative(steps_data: List[Dict[str, Any]]) -> Dict[str, Any
     return {
         "events": narrative_events,
         "statistics": stats,
+    }
+
+
+class LLMProvider(Enum):
+    """LLM 服务提供商"""
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    DUMMY = "dummy"
+
+
+@dataclass
+class LLMConfig:
+    """LLM 配置"""
+    provider: LLMProvider = LLMProvider.DUMMY
+    api_key: Optional[str] = None
+    model: str = "gpt-3.5-turbo"
+    temperature: float = 0.7
+    max_tokens: int = 1000
+
+
+class LLMEnhancedNarrator:
+    """LLM 增强叙事生成器"""
+
+    SYSTEM_PROMPT = """你是一位专业的生态学家和科学作家，擅长用生动优美的中文描述生态系统中发生的事件。
+你的任务是将生态模拟数据转化为引人入胜的自然故事。
+
+要求：
+1. 用文学性的语言描述种群变化和物种互动
+2. 解释生态现象背后的因果关系
+3. 保持科学准确性，同时增强可读性
+4. 段落结构清晰，有开头、发展和结尾
+5. 字数控制在 500-800 字之间
+6. 避免使用过于技术化的术语，让普通读者也能理解
+"""
+
+    def __init__(self, config: Optional[LLMConfig] = None):
+        self.config = config or LLMConfig()
+        self.openai_client = None
+        self.anthropic_client = None
+        self._init_client()
+
+    def _init_client(self):
+        """初始化 LLM 客户端"""
+        if self.config.provider == LLMProvider.OPENAI and OPENAI_AVAILABLE:
+            api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+            if api_key:
+                self.openai_client = OpenAI(api_key=api_key)
+        elif self.config.provider == LLMProvider.ANTHROPIC and ANTHROPIC_AVAILABLE:
+            api_key = self.config.api_key or os.getenv("ANTHROPIC_API_KEY")
+            if api_key:
+                self.anthropic_client = anthropic.Anthropic(api_key=api_key)
+
+    def _build_prompt(self, events: List[EcosystemEvent], statistics: Dict[str, Any]) -> str:
+        """构建 LLM 提示词"""
+        events_desc = []
+        for event in sorted(events, key=lambda e: e.step)[:15]:
+            events_desc.append(
+                f"- 第{event.step}步: {event.event_type.value} - {event.description} (重要性: {event.magnitude:.2f})"
+            )
+
+        stats_desc = json.dumps(statistics, ensure_ascii=False, indent=2)
+
+        return f"""请根据以下生态系统模拟数据，撰写一篇生动的生态故事。
+
+统计数据：
+{stats_desc}
+
+关键事件：
+{chr(10).join(events_desc)}
+
+请用故事化的语言描述这个生态系统的演变历程，包括种群的兴衰、物种间的互动、以及最终的生态状态。"""
+
+    def _call_openai(self, prompt: str) -> str:
+        """调用 OpenAI API"""
+        if not hasattr(self, 'openai_client') or not self.openai_client:
+            return self._fallback_narrative(prompt)
+
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.config.model,
+                messages=[
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI API error: {e}")
+            return self._fallback_narrative(prompt)
+
+    def _call_anthropic(self, prompt: str) -> str:
+        """调用 Anthropic (Claude) API"""
+        if not hasattr(self, 'anthropic_client') or not self.anthropic_client:
+            return self._fallback_narrative(prompt)
+
+        try:
+            response = self.anthropic_client.messages.create(
+                model=self.config.model,
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature,
+                system=self.SYSTEM_PROMPT,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Anthropic API error: {e}")
+            return self._fallback_narrative(prompt)
+
+    def _fallback_narrative(self, prompt: str) -> str:
+        """降级叙事生成（无 API 时使用）"""
+        return """🌿 生态系统演变故事
+
+在这片虚拟的丛林中，生命的画卷缓缓展开。各个物种遵循着自然法则，通过主动推理不断调整自己的行为策略，在生存与繁衍的博弈中寻找平衡。
+
+随着模拟的进行，我们观察到种群数量经历了多次波动。捕食者与猎物之间展开了永恒的军备竞赛，每一方的策略调整都会引发另一方的适应性变化。这种动态平衡是生态系统健康的标志。
+
+有些物种成功地适应了环境变化，种群繁荣发展；而另一些物种则可能因为竞争劣势或环境压力而走向灭绝。每一次物种的兴衰都是自然选择的见证。
+
+最终，生态系统达到了一个相对稳定的状态。存活下来的物种形成了新的食物链结构，它们将继续在这片土地上演绎生命的奇迹。
+
+这就是主动推理驱动的生态系统演化——每一个决策都塑造着未来，每一次适应都是智慧的体现。"""
+
+    def generate_enhanced_narrative(self, events: List[EcosystemEvent], statistics: Dict[str, Any]) -> str:
+        """生成 LLM 增强的叙事"""
+        prompt = self._build_prompt(events, statistics)
+
+        if self.config.provider == LLMProvider.OPENAI:
+            return self._call_openai(prompt)
+        elif self.config.provider == LLMProvider.ANTHROPIC:
+            return self._call_anthropic(prompt)
+        else:
+            return self._fallback_narrative(prompt)
+
+
+def generate_llm_enhanced_report(
+    steps_data: List[Dict[str, Any]],
+    provider: str = "dummy",
+    api_key: Optional[str] = None,
+    model: Optional[str] = None
+) -> Dict[str, Any]:
+    """生成 LLM 增强的完整报告"""
+    analyzer = EcosystemAnalyzer(steps_data)
+    events = analyzer.detect_all_events()
+    stats = analyzer.get_summary_statistics()
+
+    # 生成基础报告
+    base_generator = ChineseNarrativeGenerator(events, stats)
+    base_report = base_generator.generate_full_report()
+
+    # 准备 LLM 配置
+    config = LLMConfig()
+    config.provider = LLMProvider(provider)
+    if api_key:
+        config.api_key = api_key
+    if model:
+        config.model = model
+
+    # 生成增强叙事
+    llm_narrator = LLMEnhancedNarrator(config)
+    enhanced_narrative = llm_narrator.generate_enhanced_narrative(events, stats)
+
+    return {
+        "simulation_id": None,
+        "statistics": stats,
+        "events": [
+            {
+                "step": e.step,
+                "type": e.event_type.value,
+                "species": e.species,
+                "description": e.description,
+                "importance": round(e.magnitude, 2)
+            }
+            for e in sorted(events, key=lambda x: -x.magnitude)[:10]
+        ],
+        "base_report": base_report,
+        "enhanced_narrative": enhanced_narrative,
+        "llm_provider": provider,
+        "llm_available": {
+            "openai": OPENAI_AVAILABLE,
+            "anthropic": ANTHROPIC_AVAILABLE
+        }
     }

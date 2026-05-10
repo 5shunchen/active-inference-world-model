@@ -28,7 +28,11 @@ from pydantic import BaseModel, Field
 from .ecosystem import EcosystemSimulator, AgentType
 from .life_story_api import LifestoryAPI
 from .database import db
-from .llm_narrative import generate_ecosystem_report_from_steps, generate_simple_narrative
+from .llm_narrative import (
+    generate_ecosystem_report_from_steps,
+    generate_simple_narrative,
+    generate_llm_enhanced_report
+)
 
 
 app = FastAPI(
@@ -452,6 +456,40 @@ async def get_simulation_report(simulation_id: str, format: str = "json"):
     else:
         narrative = generate_simple_narrative(steps_data)
         return {"simulation_id": simulation_id, **narrative}
+
+
+@app.get("/api/simulations/{simulation_id}/enhanced-report")
+async def get_enhanced_simulation_report(
+    simulation_id: str,
+    provider: str = "dummy",
+    api_key: Optional[str] = None,
+    model: Optional[str] = None
+):
+    """Generate LLM-enhanced ecosystem narrative report"""
+    timeseries = db.get_population_timeseries(simulation_id)
+    if not timeseries["labels"]:
+        raise HTTPException(status_code=404, detail="Simulation not found or no data")
+
+    # Convert timeseries to steps_data format
+    steps_data = []
+    for i, label in enumerate(timeseries["labels"]):
+        steps_data.append({
+            "step": label,
+            "tigers": timeseries["tigers"][i],
+            "wolves": timeseries["wolves"][i],
+            "deer": timeseries["deer"][i],
+            "foxes": timeseries["foxes"][i],
+            "rabbits": timeseries["rabbits"][i],
+        })
+
+    result = generate_llm_enhanced_report(
+        steps_data=steps_data,
+        provider=provider,
+        api_key=api_key,
+        model=model
+    )
+    result["simulation_id"] = simulation_id
+    return result
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):

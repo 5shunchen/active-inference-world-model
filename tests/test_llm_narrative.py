@@ -14,7 +14,11 @@ from src.llm_narrative import (
     EcosystemAnalyzer,
     ChineseNarrativeGenerator,
     generate_ecosystem_report_from_steps,
-    generate_simple_narrative
+    generate_simple_narrative,
+    LLMEnhancedNarrator,
+    LLMConfig,
+    LLMProvider,
+    generate_llm_enhanced_report
 )
 
 
@@ -234,6 +238,106 @@ class TestSimpleNarrativeAPI:
             assert "species" in result["events"][0]
             assert "description" in result["events"][0]
             assert "importance" in result["events"][0]
+
+
+class TestLLMProvider:
+    def test_llm_provider_enum(self):
+        assert LLMProvider.OPENAI.value == "openai"
+        assert LLMProvider.ANTHROPIC.value == "anthropic"
+        assert LLMProvider.DUMMY.value == "dummy"
+
+
+class TestLLMConfig:
+    def test_default_config(self):
+        config = LLMConfig()
+        assert config.provider == LLMProvider.DUMMY
+        assert config.temperature == 0.7
+        assert config.max_tokens == 1000
+
+    def test_custom_config(self):
+        config = LLMConfig(
+            provider=LLMProvider.OPENAI,
+            api_key="test_key",
+            model="gpt-4",
+            temperature=0.5,
+            max_tokens=500
+        )
+        assert config.provider == LLMProvider.OPENAI
+        assert config.api_key == "test_key"
+        assert config.model == "gpt-4"
+        assert config.temperature == 0.5
+        assert config.max_tokens == 500
+
+
+class TestLLMEnhancedNarrator:
+    def test_narrator_initializes(self):
+        config = LLMConfig(provider=LLMProvider.DUMMY)
+        narrator = LLMEnhancedNarrator(config)
+        assert narrator is not None
+        assert narrator.config.provider == LLMProvider.DUMMY
+
+    def test_build_prompt(self):
+        narrator = LLMEnhancedNarrator()
+        events = [
+            EcosystemEvent(
+                step=10,
+                event_type=EventType.POPULATION_RISE,
+                species="tigers",
+                description="老虎种群增长",
+                magnitude=0.8
+            )
+        ]
+        stats = {"total_steps": 100, "surviving_species": ["tigers"]}
+
+        prompt = narrator._build_prompt(events, stats)
+        assert "老虎" in prompt
+        assert "生态系统" in prompt
+
+    def test_fallback_narrative(self):
+        narrator = LLMEnhancedNarrator()
+        narrative = narrator._fallback_narrative("test prompt")
+        assert len(narrative) > 0
+        assert "生态系统" in narrative
+
+    def test_generate_enhanced_narrative_dummy(self):
+        narrator = LLMEnhancedNarrator()
+        events = [
+            EcosystemEvent(
+                step=10,
+                event_type=EventType.POPULATION_RISE,
+                species="tigers",
+                description="老虎种群增长",
+                magnitude=0.8
+            )
+        ]
+        stats = {"total_steps": 100, "surviving_species": ["tigers"]}
+
+        narrative = narrator.generate_enhanced_narrative(events, stats)
+        assert len(narrative) > 0
+        assert "生态系统" in narrative
+
+
+class TestLLMEnhancedReport:
+    def test_generate_llm_enhanced_report_dummy(self):
+        steps_data = []
+        for i in range(20):
+            steps_data.append({
+                "tigers": max(0, 2 - i // 15),
+                "wolves": 2,
+                "deer": 10 + i,
+                "foxes": 2,
+                "rabbits": 10 + i * 2
+            })
+
+        result = generate_llm_enhanced_report(steps_data, provider="dummy")
+
+        assert "statistics" in result
+        assert "events" in result
+        assert "base_report" in result
+        assert "enhanced_narrative" in result
+        assert "llm_provider" in result
+        assert result["llm_provider"] == "dummy"
+        assert len(result["enhanced_narrative"]) > 0
 
 
 if __name__ == "__main__":
