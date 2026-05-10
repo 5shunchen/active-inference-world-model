@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from .ecosystem import EcosystemSimulator, AgentType
 from .life_story_api import LifestoryAPI
 from .database import db
+from .llm_narrative import generate_ecosystem_report_from_steps, generate_simple_narrative
 
 
 app = FastAPI(
@@ -424,6 +425,33 @@ async def delete_simulation(simulation_id: str):
     if simulation_id in simulation_results:
         del simulation_results[simulation_id]
     return {"status": "success", "message": f"Simulation {simulation_id} deleted"}
+
+
+@app.get("/api/simulations/{simulation_id}/report")
+async def get_simulation_report(simulation_id: str, format: str = "json"):
+    """Generate AI-powered ecosystem report for a simulation"""
+    timeseries = db.get_population_timeseries(simulation_id)
+    if not timeseries["labels"]:
+        raise HTTPException(status_code=404, detail="Simulation not found or no data")
+
+    # Convert timeseries to steps_data format
+    steps_data = []
+    for i, label in enumerate(timeseries["labels"]):
+        steps_data.append({
+            "step": label,
+            "tigers": timeseries["tigers"][i],
+            "wolves": timeseries["wolves"][i],
+            "deer": timeseries["deer"][i],
+            "foxes": timeseries["foxes"][i],
+            "rabbits": timeseries["rabbits"][i],
+        })
+
+    if format == "markdown":
+        report = generate_ecosystem_report_from_steps(steps_data)
+        return {"report": report, "format": "markdown"}
+    else:
+        narrative = generate_simple_narrative(steps_data)
+        return {"simulation_id": simulation_id, **narrative}
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = False):
