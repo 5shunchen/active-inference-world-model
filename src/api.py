@@ -33,13 +33,17 @@ from .llm_narrative import (
     generate_simple_narrative,
     generate_llm_enhanced_report
 )
+from .world_model.api import router as world_model_router
 
 
 app = FastAPI(
-    title="Active Inference World Simulator API",
-    description="End-to-end simulation platform for ecological life stories using active inference",
-    version="2.0.0"
+    title="Universal World Model API",
+    description="通用世界模型引擎 - 可以模拟演化任何事物的建模框架",
+    version="3.0.0"
 )
+
+# 挂载世界模型路由
+app.include_router(world_model_router)
 
 # Enable CORS
 app.add_middleware(
