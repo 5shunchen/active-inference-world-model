@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Active Inference World Simulator - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -20,7 +21,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
 
@@ -36,9 +37,13 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
+        }
+
+        .grid-full {
+            grid-column: 1 / -1;
         }
 
         .card {
@@ -47,11 +52,11 @@
             padding: 25px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s ease;
+            transition: transform 0.3s ease, border-color 0.3s ease;
         }
 
         .card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
             border-color: rgba(0, 212, 255, 0.3);
         }
 
@@ -90,6 +95,12 @@
             border-color: #00d4ff;
         }
 
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
         button {
             width: 100%;
             padding: 12px 20px;
@@ -122,32 +133,31 @@
             animation: pulse 1s infinite;
         }
 
+        .status-completed {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00d4ff;
+        }
+
+        .status-failed {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
 
-        .result-item {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-
-        .result-item h4 {
-            color: #00d4ff;
-            margin-bottom: 5px;
-        }
-
-        .result-item p {
-            color: #aaa;
-            font-size: 0.9em;
-        }
-
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 15px;
         }
 
         .stat-box {
@@ -155,6 +165,11 @@
             padding: 15px;
             border-radius: 8px;
             text-align: center;
+            transition: background 0.3s ease;
+        }
+
+        .stat-box:hover {
+            background: rgba(0, 212, 255, 0.1);
         }
 
         .stat-value {
@@ -169,36 +184,57 @@
             text-transform: uppercase;
         }
 
-        #ecosystemCanvas {
-            width: 100%;
-            border-radius: 10px;
-            background: #0a1628;
+        .chart-container {
+            position: relative;
+            height: 300px;
         }
 
-        .legend {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin-top: 15px;
-            flex-wrap: wrap;
+        .sim-list {
+            max-height: 400px;
+            overflow-y: auto;
         }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.9em;
+        .sim-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-left 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .sim-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-left-color: #00d4ff;
+        }
+
+        .sim-item.selected {
+            background: rgba(0, 212, 255, 0.15);
+            border-left-color: #00d4ff;
+        }
+
+        .sim-item h4 {
+            color: #00d4ff;
+            margin-bottom: 5px;
+            font-size: 0.95em;
+        }
+
+        .sim-item p {
             color: #aaa;
+            font-size: 0.85em;
         }
 
-        .legend-color {
-            width: 15px;
-            height: 15px;
-            border-radius: 3px;
+        .sim-item .meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: #666;
         }
 
         .narrative-box {
-            max-height: 300px;
+            max-height: 350px;
             overflow-y: auto;
             background: rgba(0, 0, 0, 0.3);
             padding: 15px;
@@ -208,7 +244,7 @@
         }
 
         .narrative-event {
-            padding: 8px;
+            padding: 10px;
             margin-bottom: 8px;
             border-left: 3px solid #00d4ff;
             background: rgba(0, 212, 255, 0.05);
@@ -232,168 +268,285 @@
             background: rgba(0, 212, 255, 0.5);
             border-radius: 3px;
         }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+
+        .tab:hover {
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .tab.active {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🐅 Active Inference World Simulator</h1>
+        <h1>🐅 Active Inference World Simulator v2.0</h1>
 
         <div class="grid">
             <!-- Control Panel -->
             <div class="card">
                 <h2>🎮 Simulation Control</h2>
+                <div class="row">
+                    <div class="form-group">
+                        <label>🐅 Tigers</label>
+                        <input type="number" id="nTigers" value="2" min="0" max="20">
+                    </div>
+                    <div class="form-group">
+                        <label>🐺 Wolves</label>
+                        <input type="number" id="nWolves" value="3" min="0" max="20">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>🦌 Deer</label>
+                        <input type="number" id="nDeer" value="10" min="0" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label>🦊 Foxes</label>
+                        <input type="number" id="nFoxes" value="4" min="0" max="20">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>🐇 Rabbits</label>
+                        <input type="number" id="nRabbits" value="15" min="0" max="50">
+                    </div>
+                    <div class="form-group">
+                        <label>⚡ Max Steps</label>
+                        <input type="number" id="maxSteps" value="300" min="10" max="2000">
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label>Simulation Type</label>
-                    <select id="simType">
-                        <option value="ecosystem">Ecosystem Simulation</option>
-                        <option value="lifestory">Life Story Generation</option>
+                    <label>🎯 Simulation Mode</label>
+                    <select id="enhancedMode">
+                        <option value="true" selected>Enhanced (Full Ecosystem)</option>
+                        <option value="false">Simple (Tiger + Deer Only)</option>
                     </select>
-                </div>
-                <div class="form-group" id="ecoControls">
-                    <label>Number of Tigers</label>
-                    <input type="number" id="nTigers" value="1" min="0" max="10">
-                </div>
-                <div class="form-group" id="ecoControls2">
-                    <label>Number of Deer</label>
-                    <input type="number" id="nDeer" value="5" min="0" max="20">
-                </div>
-                <div class="form-group">
-                    <label>Max Steps</label>
-                    <input type="number" id="maxSteps" value="200" min="10" max="2000">
                 </div>
                 <button id="startBtn" onclick="startSimulation()">🚀 Start Simulation</button>
             </div>
 
-            <!-- Live Ecosystem Visualization -->
+            <!-- Live Statistics -->
             <div class="card">
-                <h2>🌍 Ecosystem View</h2>
-                <canvas id="ecosystemCanvas" height="300"></canvas>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #ff6b35;"></div>
-                        <span>Tiger</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #8b7355;"></div>
-                        <span>Deer</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #4a90d9;"></div>
-                        <span>Water</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #2d8659;"></div>
-                        <span>Grass</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Statistics -->
-            <div class="card">
-                <h2>📊 Population Statistics</h2>
+                <h2>📊 Current Simulation</h2>
                 <div class="stats-grid">
                     <div class="stat-box">
                         <div class="stat-value" id="tigerCount">0</div>
                         <div class="stat-label">🐅 Tigers</div>
                     </div>
                     <div class="stat-box">
+                        <div class="stat-value" id="wolfCount">0</div>
+                        <div class="stat-label">🐺 Wolves</div>
+                    </div>
+                    <div class="stat-box">
                         <div class="stat-value" id="deerCount">0</div>
                         <div class="stat-label">🦌 Deer</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="foxCount">0</div>
+                        <div class="stat-label">🦊 Foxes</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="rabbitCount">0</div>
+                        <div class="stat-label">🐇 Rabbits</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-value" id="stepCount">0</div>
                         <div class="stat-label">⏱️ Steps</div>
                     </div>
-                    <div class="stat-box">
-                        <div class="stat-value" id="totalCount">0</div>
-                        <div class="stat-label">👥 Total Alive</div>
+                </div>
+                <div id="simStatus" style="margin-top: 15px; text-align: center; color: #aaa;">
+                    No simulation running
+                </div>
+            </div>
+
+            <!-- Simulation History -->
+            <div class="card">
+                <h2>📋 Simulation History</h2>
+                <button onclick="loadSimulations()" style="margin-bottom: 15px; padding: 8px;">🔄 Refresh</button>
+                <div class="sim-list" id="simList">
+                    <p style="color: #666; text-align: center;">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Population Chart -->
+        <div class="grid">
+            <div class="card grid-full">
+                <h2>📈 Population Dynamics</h2>
+                <div class="chart-container">
+                    <canvas id="populationChart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff6b35;"></div>
+                        <span>Tiger</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #808080;"></div>
+                        <span>Wolf</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #8b7355;"></div>
+                        <span>Deer</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #d2691e;"></div>
+                        <span>Fox</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f5deb3;"></div>
+                        <span>Rabbit</span>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Simulation Results -->
+        <!-- Summary & Narrative -->
+        <div class="grid">
             <div class="card">
-                <h2>📋 Simulation Results</h2>
-                <div id="simResults">
-                    <p style="color: #888; text-align: center;">No simulation running</p>
+                <h2>📝 Simulation Summary</h2>
+                <div class="narrative-box" id="summaryOutput">
+                    <p style="color: #666; text-align: center;">Select a simulation to view summary</p>
                 </div>
             </div>
-
-            <!-- Narrative Output -->
-            <div class="card" style="grid-column: span 2;">
-                <h2>📖 Life Story Narrative</h2>
-                <div class="narrative-box" id="narrativeOutput">
-                    <p style="color: #888; text-align: center;">Start a simulation to see the life story unfold...</p>
+            <div class="card">
+                <h2>🌐 API Status</h2>
+                <div class="narrative-box" id="apiStatus">
+                    <p>✅ API: Healthy</p>
+                    <p>📊 Total Simulations: <span id="totalSims">0</span></p>
+                    <p>🔗 <a href="/docs" style="color: #00d4ff;">API Documentation</a></p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let currentSimulation = null;
+        let currentSimulationId = null;
         let pollInterval = null;
-        let canvasCtx = null;
+        let chart = null;
+        let selectedSimId = null;
 
-        function initCanvas() {
-            canvas = document.getElementById('ecosystemCanvas');
-            ctx = canvas.getContext('2d');
-        }
-
-        function getAgentPositions() {
-            const tigers = Math.max(1, parseInt(document.getElementById('nTigers').value) || 1);
-            const deer = Math.max(1, parseInt(document.getElementById('nDeer').value) || 1);
-            return { tigers, deer, total: tigers + deer };
-        }
-
-        function drawAgentsOnCanvas(tigerPositions, deerPositions) {
-            if (!canvasCtx) return;
-            const ctx = document.getElementById('ecosystemCanvas');
-            const ctx2d = ctx.getContext('2d');
-
-            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw zones
-            const zones = [
-                { name: 'Prey Zone', color: '#8b7355', x: 0 },
-                { name: 'Water', color: '#4a90d9', x: 0.25 },
-                { name: 'Safe', color: '#2d8659', x: 0.5 },
-                { name: 'Grass', color: '#5a8a3a', x: 0.75 }
-            ];
-
-            zones.forEach((zone, i) => {
-                ctx.fillStyle = zone.color + '40';
-                ctx.fillRect(i * canvas.width / 4, 0, canvas.width / 4, canvas.height);
+        // Initialize chart
+        function initChart() {
+            const ctx = document.getElementById('populationChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Tigers',
+                            data: [],
+                            borderColor: '#ff6b35',
+                            backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Wolves',
+                            data: [],
+                            borderColor: '#808080',
+                            backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Deer',
+                            data: [],
+                            borderColor: '#8b7355',
+                            backgroundColor: 'rgba(139, 115, 85, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Foxes',
+                            data: [],
+                            borderColor: '#d2691e',
+                            backgroundColor: 'rgba(210, 105, 30, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Rabbits',
+                            data: [],
+                            borderColor: '#f5deb3',
+                            backgroundColor: 'rgba(245, 222, 179, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#888' },
+                            beginAtZero: true
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
             });
-
-            // Draw agents
-            const positions = [];
-
-            tigerPositions.forEach(pos => {
-                ctx.fillStyle = '#ff6b35';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            deerPositions.forEach(pos => {
-                ctx.fillStyle = '#8b7355';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
-                ctx.fill();
-            });
         }
 
-        function updateStats(tigers, deer, steps) {
-            document.getElementById('tigerCount').textContent = tigers;
-            document.getElementById('deerCount').textContent = deer;
-            document.getElementById('stepCount').textContent = steps;
-            document.getElementById('totalCount').textContent = tigers + deer;
-        }
-
+        // Start new simulation
         async function startSimulation() {
             const btn = document.getElementById('startBtn');
-            const canvas = document.getElementById('ecosystemCanvas');
-
             btn.disabled = true;
             btn.textContent = '⏳ Starting...';
 
@@ -403,95 +556,175 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         n_tigers: parseInt(document.getElementById('nTigers').value),
+                        n_wolves: parseInt(document.getElementById('nWolves').value),
                         n_deer: parseInt(document.getElementById('nDeer').value),
+                        n_foxes: parseInt(document.getElementById('nFoxes').value),
+                        n_rabbits: parseInt(document.getElementById('nRabbits').value),
                         max_steps: parseInt(document.getElementById('maxSteps').value),
-                        render_video: false
+                        render_video: false,
+                        enhanced_mode: document.getElementById('enhancedMode').value === 'true'
                     })
                 });
 
                 const result = await response.json();
+                currentSimulationId = result.simulation_id;
 
-                document.getElementById('simResults').innerHTML = `
-                    <div class="result-item">
-                        <h4><span class="status-running"></span> Running</h4>
-                        <p>ID: ${result.simulation_id}</p>
-                        <p>${result.message}</p>
-                    </div>
-                `;
+                document.getElementById('simStatus').innerHTML =
+                    `<span class="status-running"></span> Running: ${result.simulation_id}`;
 
-                pollResults(result.simulation_id);
+                // Start polling for results
+                pollResults(currentSimulationId);
 
             } catch (error) {
                 console.error('Error:', error);
-                document.getElementById('simResults').innerHTML = `
-                    <div class="result-item" style="border-left: 3px solid #ff4444;">
-                        <h4>❌ Error</h4>
-                        <p>${error.message}</p>
-                    </div>
-                `;
+                document.getElementById('simStatus').innerHTML =
+                    `<span class="status-failed"></span> Error: ${error.message}`;
+            } finally {
                 btn.disabled = false;
                 btn.textContent = '🚀 Start Simulation';
             }
         }
 
+        // Poll for simulation results
         function pollResults(simId) {
+            if (pollInterval) clearInterval(pollInterval);
+
             pollInterval = setInterval(async () => {
                 try {
+                    // First try database for detailed data
+                    const tsResponse = await fetch(`/api/simulations/${simId}/timeseries`);
+                    if (tsResponse.ok) {
+                        const tsData = await tsResponse.json();
+                        if (tsData.labels && tsData.labels.length > 0) {
+                            updateChart(tsData);
+                            updateStatsFromTimeseries(tsData);
+                        }
+                    }
+
+                    // Check status
                     const response = await fetch(`/api/results/${simId}`);
                     const result = await response.json();
 
                     if (result.status === 'completed') {
                         clearInterval(pollInterval);
-                        showCompletedResult(result);
+                        document.getElementById('simStatus').innerHTML =
+                            `<span class="status-completed"></span> Completed in ${result.runtime_seconds}s`;
+
+                        if (result.summary) {
+                            document.getElementById('summaryOutput').innerHTML =
+                                `<div class="narrative-event">${result.summary.replace(/\n/g, '<br>')}</div>`;
+                        }
+
+                        loadSimulations();
                     } else if (result.status === 'failed') {
                         clearInterval(pollInterval);
-                        showError(result.error);
+                        document.getElementById('simStatus').innerHTML =
+                            `<span class="status-failed"></span> Failed: ${result.error}`;
                     }
-
-                    updateStats(result.surviving_tigers || 0, result.surviving_deer || 0, result.total_steps || 0);
 
                 } catch (error) {
                     console.error('Poll error:', error);
                 }
-            }, 1000);
+            }, 1500);
         }
 
-        function showCompletedResult(result) {
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('startBtn').textContent = '🚀 Start Simulation';
+        // Update chart data
+        function updateChart(data) {
+            chart.data.labels = data.labels;
+            chart.data.datasets[0].data = data.tigers;
+            chart.data.datasets[1].data = data.wolves;
+            chart.data.datasets[2].data = data.deer;
+            chart.data.datasets[3].data = data.foxes;
+            chart.data.datasets[4].data = data.rabbits;
+            chart.update('none');
+        }
 
-            document.getElementById('simResults').innerHTML = `
-                <div class="result-item">
-                    <h4>✅ Completed</h4>
-                    <p>Steps: ${result.total_steps}</p>
-                    <p>Runtime: ${result.runtime_seconds}s</p>
-                    <p>Surviving Tigers: ${result.surviving_tigers}</p>
-                    <p>Surviving Deer: ${result.surviving_deer}</p>
-                </div>
-            `;
-
-            if (result.summary) {
-                const narrativeHtml = result.summary.replace(/\n/g, '<br>');
-                document.getElementById('narrativeOutput').innerHTML = `
-                    <div class="narrative-event">${narrativeHtml}</div>
-                `;
+        // Update stats display
+        function updateStatsFromTimeseries(data) {
+            const lastIdx = data.labels.length - 1;
+            if (lastIdx >= 0) {
+                document.getElementById('tigerCount').textContent = data.tigers[lastIdx] || 0;
+                document.getElementById('wolfCount').textContent = data.wolves[lastIdx] || 0;
+                document.getElementById('deerCount').textContent = data.deer[lastIdx] || 0;
+                document.getElementById('foxCount').textContent = data.foxes[lastIdx] || 0;
+                document.getElementById('rabbitCount').textContent = data.rabbits[lastIdx] || 0;
+                document.getElementById('stepCount').textContent = data.labels[lastIdx] || 0;
             }
         }
 
-        function showError(error) {
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('startBtn').textContent = '🚀 Start Simulation';
-            document.getElementById('simResults').innerHTML = `
-                <div class="result-item" style="border-left: 3px solid #ff4444;">
-                    <h4>❌ Failed</h4>
-                    <p>${error}</p>
-                </div>
-            `;
+        // Load simulation list
+        async function loadSimulations() {
+            try {
+                const response = await fetch('/api/simulations');
+                const data = await response.json();
+
+                document.getElementById('totalSims').textContent = data.total;
+
+                const listEl = document.getElementById('simList');
+                if (data.simulations.length === 0) {
+                    listEl.innerHTML = '<p style="color: #666; text-align: center;">No simulations yet</p>';
+                    return;
+                }
+
+                listEl.innerHTML = data.simulations.map(sim => `
+                    <div class="sim-item ${selectedSimId === sim.id ? 'selected' : ''}"
+                         onclick="selectSimulation('${sim.id}')">
+                        <h4>
+                            <span class="status-${sim.status}"></span>
+                            ${sim.name}
+                        </h4>
+                        <p>${sim.type} | ${sim.total_steps} steps | ${sim.runtime_seconds}s</p>
+                        <div class="meta">
+                            <span>${new Date(sim.created_at).toLocaleString()}</span>
+                            <span>${sim.status}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading simulations:', error);
+            }
+        }
+
+        // Select simulation to view
+        async function selectSimulation(simId) {
+            selectedSimId = simId;
+
+            // Highlight selected
+            document.querySelectorAll('.sim-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+
+            // Load timeseries
+            try {
+                const tsResponse = await fetch(`/api/simulations/${simId}/timeseries`);
+                const tsData = await tsResponse.json();
+                if (tsData.labels && tsData.labels.length > 0) {
+                    updateChart(tsData);
+                    updateStatsFromTimeseries(tsData);
+                }
+
+                // Load summary
+                const detailResponse = await fetch(`/api/simulations/${simId}/detail`);
+                const detail = await detailResponse.json();
+                if (detail.summary) {
+                    document.getElementById('summaryOutput').innerHTML =
+                        `<div class="narrative-event">${detail.summary.replace(/\n/g, '<br>')}</div>`;
+                }
+
+                document.getElementById('simStatus').innerHTML =
+                    `<span class="status-${detail.status}"></span> Viewing: ${detail.name}`;
+
+            } catch (error) {
+                console.error('Error loading simulation:', error);
+            }
         }
 
         // Initialize on load
         window.onload = function() {
-            // initCanvas();
+            initChart();
+            loadSimulations();
         };
     </script>
 </body>

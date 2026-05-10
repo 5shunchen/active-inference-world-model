@@ -6,3 +6,4 @@ output/
 .DS_Store
 .pytest_cache/
 *.mp4
+simulations.db

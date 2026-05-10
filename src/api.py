@@ -27,12 +27,13 @@ from pydantic import BaseModel, Field
 
 from .ecosystem import EcosystemSimulator, AgentType
 from .life_story_api import LifestoryAPI
+from .database import db
 
 
 app = FastAPI(
     title="Active Inference World Simulator API",
     description="End-to-end simulation platform for ecological life stories using active inference",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # Enable CORS
@@ -44,8 +45,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for simulation results
+# In-memory storage for simulation results (complemented by database)
 simulation_results: Dict[str, Dict] = {}
+simulation_db_ids: Dict[str, int] = {}  # Maps public ID to database ID
 
 # Mount static files and templates
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -133,6 +135,18 @@ def run_ecosystem_simulation(
     """Run ecosystem simulation in background"""
     start_time = time.time()
 
+    # Create database record
+    config = {
+        "n_tigers": n_tigers,
+        "n_wolves": n_wolves,
+        "n_deer": n_deer,
+        "n_foxes": n_foxes,
+        "n_rabbits": n_rabbits,
+        "enhanced_mode": enhanced_mode
+    }
+    db_id = db.create_simulation(simulation_id, "ecosystem", max_steps, config)
+    simulation_db_ids[simulation_id] = db_id
+
     try:
         if enhanced_mode:
             from .enhanced_ecosystem import EnhancedEcosystemSimulator
@@ -147,6 +161,10 @@ def run_ecosystem_simulation(
             sim = EcosystemSimulator(n_tigers=n_tigers, n_deer=n_deer)
         history = sim.run(max_steps=max_steps)
 
+        # Save all steps to database
+        for step_idx, step_data in enumerate(history):
+            db.add_step(db_id, step_idx + 1, step_data)
+
         # Collect results
         final = history[-1] if history else {}
 
@@ -155,7 +173,10 @@ def run_ecosystem_simulation(
             "status": "completed",
             "total_steps": len(history),
             "surviving_tigers": final.get("tigers_alive", 0),
+            "surviving_wolves": final.get("wolves_alive", 0),
             "surviving_deer": final.get("deer_alive", 0),
+            "surviving_foxes": final.get("foxes_alive", 0),
+            "surviving_rabbits": final.get("rabbits_alive", 0),
             "history": history[-50:],  # Last 50 steps only
             "summary": sim.get_summary(),
             "runtime_seconds": round(time.time() - start_time, 2),
@@ -165,13 +186,18 @@ def run_ecosystem_simulation(
 
         simulation_results[simulation_id] = results
 
+        # Mark completed in database
+        db.complete_simulation(db_id, len(history), results["runtime_seconds"], results["summary"])
+
     except Exception as e:
+        error_msg = str(e)
         simulation_results[simulation_id] = {
             "simulation_id": simulation_id,
             "status": "failed",
-            "error": str(e),
+            "error": error_msg,
             "runtime_seconds": round(time.time() - start_time, 2),
         }
+        db.fail_simulation(db_id, error_msg)
 
 
 def run_lifestory_simulation(
@@ -347,13 +373,56 @@ async def get_configuration():
     }
 
 
-@app.delete("/api/results/{simulation_id}")
-async def delete_simulation(simulation_id: str):
-    """Delete simulation results"""
-    if simulation_id not in simulation_results:
-        raise HTTPException(status_code=404, detail="Simulation not found")
+@app.get("/api/simulations")
+async def list_simulations(limit: int = 50, offset: int = 0):
+    """List all stored simulations"""
+    sims = db.list_simulations(limit, offset)
+    return {
+        "total": len(sims),
+        "simulations": sims
+    }
 
-    del simulation_results[simulation_id]
+
+@app.get("/api/simulations/{simulation_id}/detail")
+async def get_simulation_detail(simulation_id: str):
+    """Get detailed information about a simulation"""
+    detail = db.get_simulation(simulation_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    return detail
+
+
+@app.get("/api/simulations/{simulation_id}/timeseries")
+async def get_simulation_timeseries(simulation_id: str):
+    """Get population timeseries data for visualization"""
+    timeseries = db.get_population_timeseries(simulation_id)
+    if not timeseries["labels"]:
+        # Check if exists in memory
+        if simulation_id not in simulation_results:
+            raise HTTPException(status_code=404, detail="Simulation not found")
+        # Fallback to in-memory data
+        result = simulation_results[simulation_id]
+        history = result.get("history", [])
+        timeseries = {
+            "labels": [h.get("step", i) for i, h in enumerate(history)],
+            "tigers": [h.get("tigers_alive", 0) for h in history],
+            "wolves": [h.get("wolves_alive", 0) for h in history],
+            "deer": [h.get("deer_alive", 0) for h in history],
+            "foxes": [h.get("foxes_alive", 0) for h in history],
+            "rabbits": [h.get("rabbits_alive", 0) for h in history],
+        }
+    return timeseries
+
+
+@app.delete("/api/simulations/{simulation_id}")
+async def delete_simulation(simulation_id: str):
+    """Delete simulation from database"""
+    success = db.delete_simulation(simulation_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    # Also remove from memory cache
+    if simulation_id in simulation_results:
+        del simulation_results[simulation_id]
     return {"status": "success", "message": f"Simulation {simulation_id} deleted"}
 
 
