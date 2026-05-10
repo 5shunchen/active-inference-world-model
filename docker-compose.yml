@@ -1,0 +1,39 @@
+# Docker Compose for Active Inference World Simulator
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: ai-world-simulator-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./output:/app/output
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Redis for caching and task queue
+  redis:
+    image: redis:7-alpine
+    container_name: ai-world-simulator-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    profiles: ["with-redis"]
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: ai-world-simulator-network

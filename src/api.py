@@ -21,6 +21,8 @@ from enum import Enum
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .ecosystem import EcosystemSimulator, AgentType
@@ -45,6 +47,15 @@ app.add_middleware(
 # In-memory storage for simulation results
 simulation_results: Dict[str, Dict] = {}
 
+# Mount static files and templates
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# Ensure directories exist
+os.makedirs(TEMPLATE_DIR, exist_ok=True)
+os.makedirs(STATIC_DIR, exist_ok=True)
+
 
 # Pydantic Models
 class AgentConfig(BaseModel):
@@ -55,17 +66,25 @@ class AgentConfig(BaseModel):
 
 class EcosystemRequest(BaseModel):
     n_tigers: int = Field(default=1, ge=0, le=10, description="Number of tiger agents")
-    n_deer: int = Field(default=3, ge=0, le=20, description="Number of deer agents")
+    n_wolves: int = Field(default=2, ge=0, le=15, description="Number of wolf agents")
+    n_deer: int = Field(default=5, ge=0, le=30, description="Number of deer agents")
+    n_foxes: int = Field(default=3, ge=0, le=15, description="Number of fox agents")
+    n_rabbits: int = Field(default=8, ge=0, le=50, description="Number of rabbit agents")
     max_steps: int = Field(default=500, ge=1, le=5000, description="Maximum simulation steps")
     render_video: bool = Field(default=False, description="Generate video output")
+    enhanced_mode: bool = Field(default=True, description="Use enhanced ecosystem with all species")
 
     class Config:
         schema_extra = {
             "example": {
                 "n_tigers": 1,
+                "n_wolves": 2,
                 "n_deer": 5,
-                "max_steps": 200,
-                "render_video": False
+                "n_foxes": 3,
+                "n_rabbits": 8,
+                "max_steps": 300,
+                "render_video": False,
+                "enhanced_mode": True
             }
         }
 
@@ -103,15 +122,29 @@ class HealthResponse(BaseModel):
 def run_ecosystem_simulation(
     simulation_id: str,
     n_tigers: int,
+    n_wolves: int,
     n_deer: int,
+    n_foxes: int,
+    n_rabbits: int,
     max_steps: int,
-    render_video: bool = False
+    render_video: bool = False,
+    enhanced_mode: bool = True
 ):
     """Run ecosystem simulation in background"""
     start_time = time.time()
 
     try:
-        sim = EcosystemSimulator(n_tigers=n_tigers, n_deer=n_deer)
+        if enhanced_mode:
+            from .enhanced_ecosystem import EnhancedEcosystemSimulator
+            sim = EnhancedEcosystemSimulator(
+                n_tigers=n_tigers,
+                n_wolves=n_wolves,
+                n_deer=n_deer,
+                n_foxes=n_foxes,
+                n_rabbits=n_rabbits
+            )
+        else:
+            sim = EcosystemSimulator(n_tigers=n_tigers, n_deer=n_deer)
         history = sim.run(max_steps=max_steps)
 
         # Collect results
@@ -182,14 +215,25 @@ def run_lifestory_simulation(
 
 
 # API Endpoints
-@app.get("/", response_model=Dict[str, str])
-async def root():
-    """Root endpoint with API information"""
+@app.get("/", response_class=HTMLResponse)
+async def dashboard():
+    """Web Dashboard - main page"""
+    dashboard_path = os.path.join(TEMPLATE_DIR, "dashboard.html")
+    if os.path.exists(dashboard_path):
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return HTMLResponse("<h1>Active Inference World Simulator</h1><p>Dashboard coming soon</p>")
+
+
+@app.get("/api", response_model=Dict[str, str])
+async def api_root():
+    """API root endpoint with information"""
     return {
         "name": "Active Inference World Simulator API",
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/api/health",
+        "dashboard": "/",
     }
 
 
@@ -222,15 +266,21 @@ async def start_ecosystem_simulation(
         run_ecosystem_simulation,
         simulation_id=simulation_id,
         n_tigers=request.n_tigers,
+        n_wolves=request.n_wolves,
         n_deer=request.n_deer,
+        n_foxes=request.n_foxes,
+        n_rabbits=request.n_rabbits,
         max_steps=request.max_steps,
-        render_video=request.render_video
+        render_video=request.render_video,
+        enhanced_mode=request.enhanced_mode
     )
 
+    total_animals = request.n_tigers + request.n_wolves + request.n_deer + request.n_foxes + request.n_rabbits
     return SimulationResponse(
         simulation_id=simulation_id,
         status="running",
-        message=f"Ecosystem simulation started with {request.n_tigers} tigers and {request.n_deer} deer",
+        message=f"Ecosystem simulation started with {total_animals} animals "
+                f"(T:{request.n_tigers} W:{request.n_wolves} D:{request.n_deer} F:{request.n_foxes} R:{request.n_rabbits})",
         created_at=datetime.now().isoformat()
     )
 

@@ -21,8 +21,17 @@ from .active_inference import (
 
 
 class AgentType(Enum):
-    TIGER = "tiger"
-    DEER = "deer"
+    TIGER = "tiger"      # Apex predator - large, high energy needs
+    WOLF = "wolf"        # Pack hunter - medium, cooperative
+    DEER = "deer"        # Herbivore - medium, skittish
+    FOX = "fox"          # Small hunter - opportunistic
+    RABBIT = "rabbit"    # Small herbivore - fast reproduction
+
+
+class DietType(Enum):
+    CARNIVORE = "carnivore"
+    HERBIVORE = "herbivore"
+    OMNIVORE = "omnivore"
 
 
 class Position(Enum):
@@ -308,6 +317,61 @@ class EcologicalAgent:
         return self.state.alive
 
 
+# Agent type characteristics
+AGENT_TRAITS = {
+    AgentType.TIGER: {
+        "diet": DietType.CARNIVORE,
+        "prey": [AgentType.DEER, AgentType.RABBIT],
+        "max_hunger_rate": 0.05,
+        "max_thirst_rate": 0.04,
+        "hunt_success_base": 0.4,
+        "energy_per_hunt": 0.3,
+        "health_max": 1.0,
+        "color": "#ff6b35",
+    },
+    AgentType.WOLF: {
+        "diet": DietType.CARNIVORE,
+        "prey": [AgentType.DEER, AgentType.RABBIT, AgentType.FOX],
+        "max_hunger_rate": 0.045,
+        "max_thirst_rate": 0.035,
+        "hunt_success_base": 0.35,
+        "energy_per_hunt": 0.25,
+        "health_max": 0.9,
+        "color": "#808080",
+    },
+    AgentType.DEER: {
+        "diet": DietType.HERBIVORE,
+        "prey": [],
+        "max_hunger_rate": 0.035,
+        "max_thirst_rate": 0.045,
+        "hunt_success_base": 0.0,
+        "energy_per_hunt": 0.0,
+        "health_max": 0.85,
+        "color": "#8b7355",
+    },
+    AgentType.FOX: {
+        "diet": DietType.OMNIVORE,
+        "prey": [AgentType.RABBIT],
+        "max_hunger_rate": 0.03,
+        "max_thirst_rate": 0.03,
+        "hunt_success_base": 0.3,
+        "energy_per_hunt": 0.2,
+        "health_max": 0.7,
+        "color": "#d2691e",
+    },
+    AgentType.RABBIT: {
+        "diet": DietType.HERBIVORE,
+        "prey": [],
+        "max_hunger_rate": 0.025,
+        "max_thirst_rate": 0.035,
+        "hunt_success_base": 0.0,
+        "energy_per_hunt": 0.0,
+        "health_max": 0.5,
+        "color": "#f5deb3",
+    },
+}
+
+
 class EcosystemSimulator:
     """
     Full ecosystem simulation with multiple agents.
@@ -321,12 +385,12 @@ class EcosystemSimulator:
         self.agents: List[EcologicalAgent] = []
 
         # Create tigers
-        for i in range(n_tigers):
+        for _ in range(n_tigers):
             tiger = EcologicalAgent(AgentType.TIGER, self.env, initial_position=2)
             self.agents.append(tiger)
 
         # Create deer
-        for i in range(n_deer):
+        for _ in range(n_deer):
             deer = EcologicalAgent(AgentType.DEER, self.env, initial_position=3)
             self.agents.append(deer)
 

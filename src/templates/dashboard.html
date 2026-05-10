@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Inference World Simulator - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 212, 255, 0.3);
+        }
+
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(45deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-running {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .result-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .result-item h4 {
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .result-item p {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.85em;
+            text-transform: uppercase;
+        }
+
+        #ecosystemCanvas {
+            width: 100%;
+            border-radius: 10px;
+            background: #0a1628;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+
+        .narrative-box {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .narrative-event {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid #00d4ff;
+            background: rgba(0, 212, 255, 0.05);
+            border-radius: 0 5px 5px 0;
+        }
+
+        .narrative-event.time {
+            color: #7b2cbf;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.5);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐅 Active Inference World Simulator</h1>
+
+        <div class="grid">
+            <!-- Control Panel -->
+            <div class="card">
+                <h2>🎮 Simulation Control</h2>
+                <div class="form-group">
+                    <label>Simulation Type</label>
+                    <select id="simType">
+                        <option value="ecosystem">Ecosystem Simulation</option>
+                        <option value="lifestory">Life Story Generation</option>
+                    </select>
+                </div>
+                <div class="form-group" id="ecoControls">
+                    <label>Number of Tigers</label>
+                    <input type="number" id="nTigers" value="1" min="0" max="10">
+                </div>
+                <div class="form-group" id="ecoControls2">
+                    <label>Number of Deer</label>
+                    <input type="number" id="nDeer" value="5" min="0" max="20">
+                </div>
+                <div class="form-group">
+                    <label>Max Steps</label>
+                    <input type="number" id="maxSteps" value="200" min="10" max="2000">
+                </div>
+                <button id="startBtn" onclick="startSimulation()">🚀 Start Simulation</button>
+            </div>
+
+            <!-- Live Ecosystem Visualization -->
+            <div class="card">
+                <h2>🌍 Ecosystem View</h2>
+                <canvas id="ecosystemCanvas" height="300"></canvas>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff6b35;"></div>
+                        <span>Tiger</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #8b7355;"></div>
+                        <span>Deer</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4a90d9;"></div>
+                        <span>Water</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2d8659;"></div>
+                        <span>Grass</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card">
+                <h2>📊 Population Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="tigerCount">0</div>
+                        <div class="stat-label">🐅 Tigers</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="deerCount">0</div>
+                        <div class="stat-label">🦌 Deer</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="stepCount">0</div>
+                        <div class="stat-label">⏱️ Steps</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalCount">0</div>
+                        <div class="stat-label">👥 Total Alive</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Results -->
+            <div class="card">
+                <h2>📋 Simulation Results</h2>
+                <div id="simResults">
+                    <p style="color: #888; text-align: center;">No simulation running</p>
+                </div>
+            </div>
+
+            <!-- Narrative Output -->
+            <div class="card" style="grid-column: span 2;">
+                <h2>📖 Life Story Narrative</h2>
+                <div class="narrative-box" id="narrativeOutput">
+                    <p style="color: #888; text-align: center;">Start a simulation to see the life story unfold...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSimulation = null;
+        let pollInterval = null;
+        let canvasCtx = null;
+
+        function initCanvas() {
+            canvas = document.getElementById('ecosystemCanvas');
+            ctx = canvas.getContext('2d');
+        }
+
+        function getAgentPositions() {
+            const tigers = Math.max(1, parseInt(document.getElementById('nTigers').value) || 1);
+            const deer = Math.max(1, parseInt(document.getElementById('nDeer').value) || 1);
+            return { tigers, deer, total: tigers + deer };
+        }
+
+        function drawAgentsOnCanvas(tigerPositions, deerPositions) {
+            if (!canvasCtx) return;
+            const ctx = document.getElementById('ecosystemCanvas');
+            const ctx2d = ctx.getContext('2d');
+
+            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw zones
+            const zones = [
+                { name: 'Prey Zone', color: '#8b7355', x: 0 },
+                { name: 'Water', color: '#4a90d9', x: 0.25 },
+                { name: 'Safe', color: '#2d8659', x: 0.5 },
+                { name: 'Grass', color: '#5a8a3a', x: 0.75 }
+            ];
+
+            zones.forEach((zone, i) => {
+                ctx.fillStyle = zone.color + '40';
+                ctx.fillRect(i * canvas.width / 4, 0, canvas.width / 4, canvas.height);
+            });
+
+            // Draw agents
+            const positions = [];
+
+            tigerPositions.forEach(pos => {
+                ctx.fillStyle = '#ff6b35';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            deerPositions.forEach(pos => {
+                ctx.fillStyle = '#8b7355';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function updateStats(tigers, deer, steps) {
+            document.getElementById('tigerCount').textContent = tigers;
+            document.getElementById('deerCount').textContent = deer;
+            document.getElementById('stepCount').textContent = steps;
+            document.getElementById('totalCount').textContent = tigers + deer;
+        }
+
+        async function startSimulation() {
+            const btn = document.getElementById('startBtn');
+            const canvas = document.getElementById('ecosystemCanvas');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Starting...';
+
+            try {
+                const response = await fetch('/api/ecosystem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        n_tigers: parseInt(document.getElementById('nTigers').value),
+                        n_deer: parseInt(document.getElementById('nDeer').value),
+                        max_steps: parseInt(document.getElementById('maxSteps').value),
+                        render_video: false
+                    })
+                });
+
+                const result = await response.json();
+
+                document.getElementById('simResults').innerHTML = `
+                    <div class="result-item">
+                        <h4><span class="status-running"></span> Running</h4>
+                        <p>ID: ${result.simulation_id}</p>
+                        <p>${result.message}</p>
+                    </div>
+                `;
+
+                pollResults(result.simulation_id);
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('simResults').innerHTML = `
+                    <div class="result-item" style="border-left: 3px solid #ff4444;">
+                        <h4>❌ Error</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                btn.disabled = false;
+                btn.textContent = '🚀 Start Simulation';
+            }
+        }
+
+        function pollResults(simId) {
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/results/${simId}`);
+                    const result = await response.json();
+
+                    if (result.status === 'completed') {
+                        clearInterval(pollInterval);
+                        showCompletedResult(result);
+                    } else if (result.status === 'failed') {
+                        clearInterval(pollInterval);
+                        showError(result.error);
+                    }
+
+                    updateStats(result.surviving_tigers || 0, result.surviving_deer || 0, result.total_steps || 0);
+
+                } catch (error) {
+                    console.error('Poll error:', error);
+                }
+            }, 1000);
+        }
+
+        function showCompletedResult(result) {
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').textContent = '🚀 Start Simulation';
+
+            document.getElementById('simResults').innerHTML = `
+                <div class="result-item">
+                    <h4>✅ Completed</h4>
+                    <p>Steps: ${result.total_steps}</p>
+                    <p>Runtime: ${result.runtime_seconds}s</p>
+                    <p>Surviving Tigers: ${result.surviving_tigers}</p>
+                    <p>Surviving Deer: ${result.surviving_deer}</p>
+                </div>
+            `;
+
+            if (result.summary) {
+                const narrativeHtml = result.summary.replace(/\n/g, '<br>');
+                document.getElementById('narrativeOutput').innerHTML = `
+                    <div class="narrative-event">${narrativeHtml}</div>
+                `;
+            }
+        }
+
+        function showError(error) {
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').textContent = '🚀 Start Simulation';
+            document.getElementById('simResults').innerHTML = `
+                <div class="result-item" style="border-left: 3px solid #ff4444;">
+                    <h4>❌ Failed</h4>
+                    <p>${error}</p>
+                </div>
+            `;
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            // initCanvas();
+        };
+    </script>
+</body>
+</html>
